@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Windows.Forms;
 
 namespace CapriDesktop
 {
@@ -146,9 +147,31 @@ namespace CapriDesktop
                 if (restored == null) throw new Exception("The profile menu could not discover a local character.");
                 RefreshCharactersMenu();
                 if (charactersMenu.DropDownItems.Count < 4) throw new Exception("The character menu is empty.");
+                ToolStripMenuItem lunaItem = null;
+                foreach (ToolStripItem item in charactersMenu.DropDownItems) if (item.Text == "Luna") lunaItem = item as ToolStripMenuItem;
+                if (lunaItem == null) throw new Exception("The native menu has no Luna entry.");
+                lunaItem.PerformClick();
+                if (catalog.Current.Id != "smoke-luna" || appliedCharacter != "smoke-luna") throw new Exception("The native profile menu did not switch character.");
+                menu.Show(this, Point.Empty);
+                charactersMenu.Select();
+                charactersMenu.ShowDropDown();
+                Application.DoEvents();
+                Rectangle menuArea = Rectangle.Union(menu.Bounds, charactersMenu.DropDown.Bounds);
+                using (Bitmap picture = new Bitmap(menuArea.Width + 48, menuArea.Height + 48))
+                {
+                    using (Graphics drawing = Graphics.FromImage(picture))
+                    {
+                        drawing.Clear(Color.FromArgb(44, 47, 56));
+                        foreach (ToolStripDropDown drop in new ToolStripDropDown[] { menu, charactersMenu.DropDown }) Snapped(drawing, drop, drop.Left - menuArea.Left + 24, drop.Top - menuArea.Top + 24);
+                    }
+                    picture.Save(Path.Combine(output, "characters-menu.png"), System.Drawing.Imaging.ImageFormat.Png);
+                }
+                menu.Close();
+                if (!ChangeCharacter(before, out reason)) throw new Exception("Could not restore the profile after the menu click: " + reason);
                 Preferences fresh = Preferences.Fresh();
                 if (fresh.Permissions != Security.Of(Security.Guarded) || fresh.CheckIns || fresh.HeyCapri || fresh.ListenCapri || !fresh.NoDiscord || !fresh.StartupSet) throw new Exception("CompanionLab defaults enable intrusive or privileged behavior.");
                 checks.Add("PASS character selection: discovery/menu, busy rejection, malformed-profile rollback, voice restoration, independent persistence and conservative fresh-install defaults");
+                checks.Add("PASS native character menu: its real click handler selects Luna and the rendered submenu is captured in characters-menu.png");
                 checks.Add("LIMIT character voice routing was verified without model weights or audio devices; real Russian/English TTS and live LLM credentials are not configured");
             }
             finally
