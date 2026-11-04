@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "luna",
+  "name": "Luna",
+  "renderer": "capri-strip-v1",
+  "personalityFile": "personality.md",
+  "voice": { "mode": "off" },
+  "sprites": []
+}

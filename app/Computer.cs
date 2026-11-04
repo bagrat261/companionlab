@@ -3435,7 +3435,7 @@ namespace CapriDesktop
             helper = null;
             if (map == null)
             {
-                sharedName = "Local\\Capri.Input." + Guid.NewGuid().ToString("N");
+                sharedName = "Local\\CompanionLab.Input." + Guid.NewGuid().ToString("N");
                 map = System.IO.MemoryMappedFiles.MemoryMappedFile.CreateNew(sharedName, Bytes);
                 state = map.CreateViewAccessor();
             }

@@ -37,12 +37,13 @@ namespace CapriDesktop
             if (smoke && !SmokeRun.Worker) return SmokeRun.Run(args);
             SmokeOptions smokeOptions = smoke ? SmokeOptions.Parse(args) : null;
             bool bench = args.Length == 2 && args[0] == "--bench";
+            bool portable = args.Length == 2 && args[0] == "--data-dir";
             if (args.Length == 1 && args[0] == "--stream") Computer.Streaming = Computer.StreamingAlways = true;
             string identity = WindowsIdentity.GetCurrent().User.Value;
             bool first;
-            using (Mutex mutex = new Mutex(true, "Local\\Capri.Desktop." + identity + (smoke ? ".Test.Worker" : bench ? ".Bench" : ""), out first))
-            using (EventWaitHandle restore = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\Capri.Restore." + identity + (smoke ? ".Test.Worker" : bench ? ".Bench" : "")))
-            using (EventWaitHandle shown = new EventWaitHandle(false, EventResetMode.ManualReset, "Local\\Capri.Shown." + identity + (smoke ? ".Test.Worker" : bench ? ".Bench" : "")))
+            using (Mutex mutex = new Mutex(true, "Local\\CompanionLab.Desktop." + identity + (smoke ? ".Test.Worker" : bench ? ".Bench" : ""), out first))
+            using (EventWaitHandle restore = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\CompanionLab.Restore." + identity + (smoke ? ".Test.Worker" : bench ? ".Bench" : "")))
+            using (EventWaitHandle shown = new EventWaitHandle(false, EventResetMode.ManualReset, "Local\\CompanionLab.Shown." + identity + (smoke ? ".Test.Worker" : bench ? ".Bench" : "")))
             {
                 if (!first)
                 {
@@ -60,7 +61,7 @@ namespace CapriDesktop
                 }
                 try
                 {
-                    string data = smoke || bench ? Path.GetFullPath(args[1]) : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Capri");
+                    string data = smoke || bench || portable ? Path.GetFullPath(args[1]) : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CompanionLab");
                     Brain.LogPath = Path.Combine(data, "errors.txt");
                     // Whatever ends her, their own cursor comes back, and a crash goes in errors.txt.
                     AppDomain.CurrentDomain.ProcessExit += delegate { HerCursor.Off(); };
@@ -73,7 +74,10 @@ namespace CapriDesktop
                         StartedFresh = Starting(data);
                     }
                     else Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
-                    using (Companion app = new Companion(smoke ? Environment.GetEnvironmentVariable("CAPRI_SMOKE_DATA") ?? data : data, restore, shown, smoke))
+                    string appData = smoke ? Environment.GetEnvironmentVariable("CAPRI_SMOKE_DATA") ?? data : data;
+                    CharacterRuntime.Open(appData);
+                    ActionJournal.Path = Path.Combine(appData, "actions.log");
+                    using (Companion app = new Companion(appData, restore, shown, smoke))
                     {
                         if (smoke) app.StartSmokeTest(data, smokeOptions);
                         if (bench) app.StartBench(data);
@@ -143,7 +147,7 @@ namespace CapriDesktop
             Preferences old;
             try { using (FileStream stream = File.OpenRead(crashed)) old = (Preferences)new DataContractJsonSerializer(typeof(Preferences)).ReadObject(stream); }
             catch (Exception) { return; }
-            Preferences fresh = new Preferences { Language = Brain.SystemLanguage(System.Globalization.CultureInfo.CurrentUICulture) };
+            Preferences fresh = Preferences.Fresh();
             fresh.VoiceKey = old.VoiceKey; fresh.VoiceId = old.VoiceId; fresh.VoiceModel = old.VoiceModel;
             fresh.AgentId = old.AgentId; fresh.AgentVersion = old.AgentVersion; fresh.AgentPolyglot = old.AgentPolyglot; fresh.AgentPersonality = old.AgentPersonality;
             fresh.TextKey = old.TextKey; fresh.TextModel = old.TextModel;
@@ -467,6 +471,8 @@ namespace CapriDesktop
     [DataContract]
     internal sealed class Preferences
     {
+        [DataMember] public System.Collections.Generic.Dictionary<string, CharacterVoiceState> CharacterVoices;
+        [DataMember] public string CharacterVoiceOwner;
         [DataMember] public int X;
         [DataMember] public int Y;
         [DataMember] public bool HasPosition;
@@ -673,6 +679,10 @@ namespace CapriDesktop
         {
             Preferences fresh = new Preferences { Language = Brain.SystemLanguage(System.Globalization.CultureInfo.CurrentUICulture) };
             fresh.Tune();
+            fresh.Permissions = Security.Of(Security.Guarded);
+            fresh.CheckIns = fresh.FollowUps = fresh.CaughtUp = false;
+            fresh.NoDiscord = true;
+            fresh.StartupSet = true;
             return fresh;
         }
 
@@ -1082,6 +1092,7 @@ namespace CapriDesktop
         // mirror of Strip isn't her. They're stored mirrored back onto Strip's cells and drawn mirrored like the rest.
         private Bitmap flipped;
         private bool fetching;
+        private int generation;
         private int stripUsed, flippedUsed;
         internal readonly int Count;
         internal readonly double Fps;
@@ -1194,10 +1205,12 @@ namespace CapriDesktop
             if (source != null) { source.Warm(left); return; }
             bool wantLeft = left && flippable;
             if (wantLeft) flippedUsed = Environment.TickCount; else stripUsed = Environment.TickCount;
+            int started;
             lock (gate)
             {
                 if (fetching || (wantLeft ? flipped != null : strip != null)) return;
                 fetching = true;
+                started = generation;
             }
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
@@ -1209,6 +1222,7 @@ namespace CapriDesktop
                 {
                     fetching = false;
                     if (art == null) return;
+                    if (started != generation) { art.Dispose(); return; }
                     if (wantLeft && flipped == null) flipped = art;
                     else if (!wantLeft && strip == null) strip = art;
                     else art.Dispose();
@@ -1247,6 +1261,20 @@ namespace CapriDesktop
             return bytes;
         }
 
+        internal static void ResetAll()
+        {
+            Clip[] clips;
+            lock (all) clips = all.ToArray();
+            foreach (Clip clip in clips)
+                lock (clip.gate)
+                {
+                    clip.generation++;
+                    if (clip.strip != null) clip.strip.Dispose();
+                    if (clip.flipped != null) clip.flipped.Dispose();
+                    clip.strip = clip.flipped = null;
+                }
+        }
+
         internal static void DisposeAll()
         {
             Clip[] clips;
@@ -1254,6 +1282,7 @@ namespace CapriDesktop
             foreach (Clip clip in clips)
                 lock (clip.gate)
                 {
+                    clip.generation++;
                     if (clip.strip != null) clip.strip.Dispose();
                     if (clip.flipped != null) clip.flipped.Dispose();
                     clip.strip = clip.flipped = null;
@@ -1950,6 +1979,7 @@ namespace CapriDesktop
             if (careNew) preferences.CareWritten = careLines.Create();
             care = new Care(delegate { return clock.Elapsed.TotalSeconds; }, delegate { return DateTime.Now; }, careLines.Pick);
             // SECURITY: their toggles, with "Hey Capri" kept in its own setting for her wake word.
+            if (!smoke) ConservativePermissions(preferences);
             Migrate(preferences);
             Security.Load(preferences.Permissions);
             Security.HeyOn = delegate { return preferences.HeyCapri; };
@@ -2078,7 +2108,8 @@ namespace CapriDesktop
                 drop.ShowCheckMargin = parent != helpItem;
             }
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(new ToolStripMenuItem("Quit Capri", null, delegate { Quit(); }));
+            AddCharactersMenu();
+            menu.Items.Add(new ToolStripMenuItem("Quit CompanionLab", null, delegate { Quit(); }));
             menu.Opened += delegate { Computer.MenuOpen = true; };
             menu.Closed += delegate { Computer.MenuOpen = false; };
             playerMenu = new ContextMenuStrip();
@@ -2183,6 +2214,7 @@ namespace CapriDesktop
             voice.Model = string.IsNullOrEmpty(preferences.VoiceModel) ? null : preferences.VoiceModel;
             ShowVoice();
             mainframe.ShowMic(MicName(preferences.Mic));
+            SetUpCharacters();
             StartHearingStatus();
             pill.Typing += OpenTyper;
             pill.Voice += ToggleChat;
@@ -2325,7 +2357,7 @@ namespace CapriDesktop
             if (!testing) GreetSoon();
             listenAt = clock.Elapsed.TotalSeconds + (GreetPause + 500) / 1000.0;
             if (!testing) AgentVoice();
-            if (!testing && FreeChatOn) { GetFreeVoice(); GetFreeEars(); }
+            if (!testing && FreeChatOn && preferences.HeyCapri) { GetFreeVoice(); GetFreeEars(); }
             UpdateCallEars();
             ShowCallPanel();
             // An update can move her HD voice to a new engine: the old pack goes, and with HD on, the new one comes down.
@@ -2451,7 +2483,7 @@ namespace CapriDesktop
 
         internal static Bitmap LoadArt(string name)
         {
-            using (Stream image = Assembly.GetExecutingAssembly().GetManifestResourceStream(name))
+            using (Stream image = CharacterRuntime.OpenArt(name))
             {
                 if (image == null) return null;
                 using (Bitmap original = new Bitmap(image))
@@ -2601,6 +2633,7 @@ namespace CapriDesktop
 
         private void CheckForUpdates(bool asked)
         {
+            if (!testing) { mainframe.UpdateNote(CharacterRuntime.UpdateNote, false); return; }
             if (updating || installing) return;
             updating = true;
             updateStarted = true;
@@ -2712,6 +2745,7 @@ namespace CapriDesktop
 
         private void InstallUpdate()
         {
+            if (!testing) { mainframe.UpdateNote(CharacterRuntime.UpdateNote, false); return; }
             if (updating || installing || updateFile == null) return;
             installing = true;
             updateItem.Enabled = false;
@@ -4068,7 +4102,7 @@ namespace CapriDesktop
 
         private static bool Installed()
         {
-            try { return string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Capri", "Capri.exe")), StringComparison.OrdinalIgnoreCase); }
+            try { return string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CompanionLab", "CompanionLab.exe")), StringComparison.OrdinalIgnoreCase); }
             catch (ArgumentException) { return false; }
             catch (NotSupportedException) { return false; }
             catch (IOException) { return false; }
@@ -4819,6 +4853,7 @@ namespace CapriDesktop
 
         private string UpdateTool(ToolArguments args)
         {
+            if (!testing) return CharacterRuntime.UpdateNote;
             if (InvokeRequired) return (string)Invoke(new Func<ToolArguments, string>(UpdateTool), args);
             if (args.Action == "status") return installing ? "The update is installing." : updating ? "I'm checking for an update." : string.IsNullOrEmpty(mainframe.UpdateStatus) ? "I haven't checked for updates yet." : mainframe.UpdateStatus;
             if (installing) return "The update is already installing.";
@@ -12440,6 +12475,11 @@ namespace CapriDesktop
 
         private void SavePreferences()
         {
+            if (appliedCharacter != null && preferences.CharacterVoices != null)
+            {
+                preferences.CharacterVoiceOwner = appliedCharacter;
+                preferences.CharacterVoices[appliedCharacter] = CharacterVoiceState.Capture(preferences);
+            }
             // On the task panel she's only visiting, so where she sat before is what's kept. Lying, it's where she'd sit, since
             // she comes back sitting.
             Point spot = onPanel ? panelHome : lying ? new Point(anchor.X + (int)(preferences.Size * SitX) - (int)(preferences.Size * (facingLeft ? 1 - SitRight : SitRight)), anchor.Y) : anchor;
@@ -26367,6 +26407,8 @@ namespace CapriDesktop
 
         private void RunSmokeSections(System.Collections.Generic.List<string> checks, string output, Func<string> findGame)
         {
+            Section(checks, "SmokeCharacters", delegate { SmokeCharacters(checks, output); });
+            Section(checks, "SmokeCharacterRegressions", delegate { SmokeCharacterRegressions(checks, output); });
             Section(checks, "HologramChecks", delegate { HologramChecks(checks, output); });
             Section(checks, "SmokeReportedLogic", delegate { SmokeReportedLogic(checks); });
             Section(checks, "SmokeComments", delegate { SmokeComments(checks); });
@@ -28918,7 +28960,7 @@ namespace CapriDesktop
                             checks.Add("PASS size menu");
                             System.Collections.Generic.List<string> tops = new System.Collections.Generic.List<string>();
                             foreach (ToolStripItem top in menu.Items) if (top.Available) tops.Add(top.Text);
-                            if (string.Join(",", tops.ToArray()) != "CAPRI  /  " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + ",,Open Capri Mainframe,Hide Capri,Size,Move,Hologram,Help,,Quit Capri") throw new Exception("The right-click menu is not the short one: " + string.Join(",", tops.ToArray()));
+                            if (string.Join(",", tops.ToArray()) != "CAPRI  /  " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + ",,Open Capri Mainframe,Hide Capri,Size,Move,Hologram,Help,,Characters (Capri),Quit CompanionLab") throw new Exception("The right-click menu is not the short one: " + string.Join(",", tops.ToArray()));
                             bool hiddenWas = hidden, popsWere = preferences.CheckIns;
                             Point popFrom = anchor;
                             Ledge popSeat = seat;
@@ -37529,7 +37571,7 @@ namespace CapriDesktop
                             checks.Add("PASS her wake word pack: pinned to k2-fsa's sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2 (17,626,723 bytes, its SHA-256), it downloads with its checksum into wake, unpacks with Windows tar and only counts as ready once her free voice brings sherpa-onnx");
                             // The real spotter, where her free voice is on this PC: she says "Hey Capri" in her four voices and it fires each time,
                             // and it stays quiet through everyday talk and her own lines, and through "Hey Capri" while she's talking.
-                            string herData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Capri");
+                            string herData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CompanionLab");
                             string wakeVoiceData = kokoro.Installed ? Path.GetDirectoryName(settingsPath) : herData;
                             LocalVoice wakeSpeaker = new LocalVoice(wakeVoiceData);
                             if (IntPtr.Size != 8 || !wakeSpeaker.Installed) checks.Add("LIMIT Hey Capri on real speech not run; her free voice, which brings sherpa-onnx and says the test lines, is not installed on this PC");
@@ -39047,7 +39089,7 @@ namespace CapriDesktop
                 string momentCrowded = mainframe.Overlap() ?? mainframe.Outside();
                 if (momentCrowded != null) throw new Exception("The big moment switch crowded Settings: " + momentCrowded);
                 string momentHelp = SelfKnow.Matching("How does Save big moments work?");
-                if (momentHelp == null || !momentHelp.StartsWith("Save big moments:", StringComparison.Ordinal) || !momentHelp.Contains("Comments off outside Gaming Mode") || !momentHelp.Contains("Videos\\Capri Clips"))
+                if (momentHelp == null || !momentHelp.StartsWith("Save big moments:", StringComparison.Ordinal) || !momentHelp.Contains("Comments off outside Gaming Mode") || !momentHelp.Contains("Videos\\CompanionLab Clips"))
                     throw new Exception("Save big moments did not explain its switch, comments or storage.");
                 checks.Add("PASS Save big moments starts off, saves and shows both switches when enabled, leaves manual clips on when disabled, follows Clip my games off, fits Settings without overlaps, and has its own help topic");
             }

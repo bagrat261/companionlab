@@ -17,8 +17,8 @@ namespace CapriSetup
 {
     internal static class Program
     {
-        internal static string InstallPath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Capri"); } }
-        internal const string RegistryPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Capri.Desktop";
+        internal static string InstallPath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CompanionLab"); } }
+        internal const string RegistryPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\CompanionLab.Desktop";
 
         [STAThread]
         private static int Main(string[] args)
@@ -50,22 +50,34 @@ namespace CapriSetup
                     {
                         bool same = false;
                         try { same = process.StartTime.ToUniversalTime().Ticks == started; } catch (InvalidOperationException) { }
-                        if (same && !process.WaitForExit(60000)) throw new IOException("Capri is still closing. Try the update again.");
+                        if (same && !process.WaitForExit(60000)) throw new IOException("CompanionLab is still closing. Try the update again.");
                     }
                 Install(false);
-                using (Process launched = Process.Start(new ProcessStartInfo(Path.Combine(InstallPath, "Capri.exe")) { UseShellExecute = true, WorkingDirectory = InstallPath }))
-                    if (launched == null) throw new IOException("Capri updated but couldn't restart. Open her from the Start menu.");
+                using (Process launched = Process.Start(new ProcessStartInfo(Path.Combine(InstallPath, "CompanionLab.exe")) { UseShellExecute = true, WorkingDirectory = InstallPath }))
+                    if (launched == null) throw new IOException("CompanionLab updated but couldn't restart. Open her from the Start menu.");
                 return 0;
             }
-            catch (Exception error) { Notice.Tell(null, error.Message, "Capri couldn't update", true); return 1; }
+            catch (Exception error) { Notice.Tell(null, error.Message, "CompanionLab couldn't update", true); return 1; }
+        }
+
+        private static void WriteNotices(string folder)
+        {
+            foreach (string name in new[] { "LICENSE.md", "NOTICE.md", "OFL-ShareTechMono.txt" })
+            {
+                using (Stream data = Assembly.GetExecutingAssembly().GetManifestResourceStream("CompanionLab." + name))
+                {
+                    if (data == null) throw new InvalidDataException("Required licence notice is missing: " + name);
+                    using (StreamReader reader = new StreamReader(data)) File.WriteAllText(Path.Combine(folder, name), reader.ReadToEnd());
+                }
+            }
         }
 
         internal static byte[] Payload()
         {
-            using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("Capri.App.exe"))
+            using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("CompanionLab.App.exe"))
             using (MemoryStream memory = new MemoryStream())
             {
-                if (source == null) throw new InvalidDataException("The Capri application payload is missing.");
+                if (source == null) throw new InvalidDataException("The CompanionLab application payload is missing.");
                 source.CopyTo(memory);
                 return memory.ToArray();
             }
@@ -79,19 +91,20 @@ namespace CapriSetup
                 Directory.CreateDirectory(output);
                 byte[] bytes = Payload();
                 if (bytes.Length < 1024 || bytes[0] != 77 || bytes[1] != 90) throw new InvalidDataException("Application payload is not a Windows executable.");
-                File.WriteAllBytes(Path.Combine(output, "Capri.exe"), bytes);
+                File.WriteAllBytes(Path.Combine(output, "CompanionLab.exe"), bytes);
+                WriteNotices(output);
                 using (SHA256 sha = SHA256.Create()) File.WriteAllText(Path.Combine(output, "payload.sha256"), BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant());
-                if (!Ours(Path.Combine(output, "Capri.exe"))) throw new InvalidDataException("The installer doesn't recognise its own Capri.exe.");
-                if (Ours(Application.ExecutablePath) || Ours(Path.Combine(Environment.SystemDirectory, "notepad.exe")) || Ours(Path.Combine(output, "missing.exe"))) throw new InvalidDataException("The installer takes other programs for Capri.");
-                string home = Path.Combine(output, "Capri");
-                if (!Inside(Path.Combine(home, "Capri.exe"), home) || !Inside(Path.Combine(home, "brain", "llama-server.exe"), home + "\\") || Inside(Path.Combine(output, "Capri2", "Capri.exe"), home) || Inside(Path.Combine(Environment.SystemDirectory, "notepad.exe"), home) || Inside(home, home)) throw new InvalidDataException("The uninstaller would close the wrong programs.");
-                string link = Path.Combine(output, "Capri.lnk");
+                if (!Ours(Path.Combine(output, "CompanionLab.exe"))) throw new InvalidDataException("The installer doesn't recognise its own CompanionLab.exe.");
+                if (Ours(Application.ExecutablePath) || Ours(Path.Combine(Environment.SystemDirectory, "notepad.exe")) || Ours(Path.Combine(output, "missing.exe"))) throw new InvalidDataException("The installer takes other programs for CompanionLab.");
+                string home = Path.Combine(output, "CompanionLab");
+                if (!Inside(Path.Combine(home, "CompanionLab.exe"), home) || !Inside(Path.Combine(home, "brain", "llama-server.exe"), home + "\\") || Inside(Path.Combine(output, "Capri2", "CompanionLab.exe"), home) || Inside(Path.Combine(Environment.SystemDirectory, "notepad.exe"), home) || Inside(home, home)) throw new InvalidDataException("The uninstaller would close the wrong programs.");
+                string link = Path.Combine(output, "CompanionLab.lnk");
                 File.WriteAllText(link, "an old shortcut");
                 File.SetAttributes(link, FileAttributes.ReadOnly);
-                string unsaved = Shortcut(link, Path.Combine(output, "Capri.exe"));
-                if (unsaved != null || !string.Equals(LinkTarget(link), Path.Combine(output, "Capri.exe"), StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The installer can't save her shortcut. " + unsaved);
+                string unsaved = Shortcut(link, Path.Combine(output, "CompanionLab.exe"));
+                if (unsaved != null || !string.Equals(LinkTarget(link), Path.Combine(output, "CompanionLab.exe"), StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The installer can't save her shortcut. " + unsaved);
                 File.Delete(link);
-                if (Shortcut(Path.Combine(output, "missing", "Capri.lnk"), Path.Combine(output, "Capri.exe")) == null) throw new InvalidDataException("A shortcut Windows can't save counts as saved.");
+                if (Shortcut(Path.Combine(output, "missing", "CompanionLab.lnk"), Path.Combine(output, "CompanionLab.exe")) == null) throw new InvalidDataException("A shortcut Windows can't save counts as saved.");
                 using (SetupWindow preview = new SetupWindow(false))
                 {
                     preview.Show();
@@ -111,19 +124,19 @@ namespace CapriSetup
                     farewell.Close();
                 }
                 // Her notices, which stand in for Windows' grey boxes, fit their message under their title with OK below it.
-                using (Notice told = new Notice("Capri has been removed.\n\nYour position and size settings were kept in " + InstallPath + ".", "Capri", false))
-                using (Notice failed = new Notice("There's a Capri.exe in " + InstallPath + " that isn't this Capri. Move it out of that folder, then install again.", "Capri couldn't install", true))
+                using (Notice told = new Notice("CompanionLab has been removed.\n\nYour position and size settings were kept in " + InstallPath + ".", "CompanionLab", false))
+                using (Notice failed = new Notice("There's a CompanionLab.exe in " + InstallPath + " that isn't this CompanionLab. Move it out of that folder, then install again.", "CompanionLab couldn't install", true))
                 {
                     told.Show();
                     failed.Show();
                     Application.DoEvents();
-                    if (!told.Fits || !failed.Fits || !told.Said.StartsWith("CAPRI\nCapri has been removed.", StringComparison.Ordinal) || !failed.Said.StartsWith("CAPRI COULDN'T INSTALL\n", StringComparison.Ordinal)) throw new InvalidDataException("A notice doesn't fit or show its message: " + told.Said + " / " + failed.Said);
+                    if (!told.Fits || !failed.Fits || !told.Said.StartsWith("COMPANIONLAB\nCompanionLab has been removed.", StringComparison.Ordinal) || !failed.Said.StartsWith("COMPANIONLAB COULDN'T INSTALL\n", StringComparison.Ordinal)) throw new InvalidDataException("A notice doesn't fit or show its message: " + told.Said + " / " + failed.Said);
                     Snap(told, Path.Combine(output, "notice.png"));
                     Snap(failed, Path.Combine(output, "notice-error.png"));
                     told.Close();
                     failed.Close();
                 }
-                File.WriteAllText(Path.Combine(output, "packaging-test.txt"), "PASS embedded executable extracted\nPASS PE signature\nPASS SHA-256 computed\nPASS an unmarked Capri.exe is recognised as Capri, other programs aren't\nPASS installer and uninstaller windows rendered\nPASS her notices show their title, message and OK in her look, sized to fit the message\nPASS the installer says it's installing the local speech model, that it may take some time, and that an API key gives a better, faster voice\nPASS the uninstaller closes Capri and anything running from her folder, like her brain, and nothing else\nPASS her shortcut is saved through Windows' own shell link, even over an old read-only one, and points at Capri.exe\nPASS a shortcut Windows won't save comes back as its reason instead of stopping the install\nLIMIT installation and uninstallation were not performed\n");
+                File.WriteAllText(Path.Combine(output, "packaging-test.txt"), "PASS embedded executable extracted\nPASS PE signature\nPASS SHA-256 computed\nPASS an unmarked CompanionLab.exe is recognised as CompanionLab, other programs aren't\nPASS installer and uninstaller windows rendered\nPASS her notices show their title, message and OK in her look, sized to fit the message\nPASS the installer says it's installing the local speech model, that it may take some time, and that an API key gives a better, faster voice\nPASS the uninstaller closes CompanionLab and anything running from her folder, like her brain, and nothing else\nPASS her shortcut is saved through Windows' own shell link, even over an old read-only one, and points at CompanionLab.exe\nPASS a shortcut Windows won't save comes back as its reason instead of stopping the install\nLIMIT installation and uninstallation were not performed\n");
                 return 0;
             }
             catch (Exception error) { Directory.CreateDirectory(output); File.WriteAllText(Path.Combine(output, "failure.txt"), error.ToString()); return 1; }
@@ -134,22 +147,23 @@ namespace CapriSetup
         internal static string Install(bool desktop)
         {
             string destination = InstallPath;
-            string marker = Path.Combine(destination, ".capri-install");
-            string existing = Path.Combine(destination, "Capri.exe");
-            if (Directory.Exists(destination) && !File.Exists(marker) && File.Exists(existing) && !Ours(existing)) throw new IOException("There's a Capri.exe in " + destination + " that isn't this Capri. Move it out of that folder, then install again.");
+            string marker = Path.Combine(destination, ".companionlab-install");
+            string existing = Path.Combine(destination, "CompanionLab.exe");
+            if (Directory.Exists(destination) && !File.Exists(marker) && File.Exists(existing) && !Ours(existing)) throw new IOException("There's a CompanionLab.exe in " + destination + " that isn't this CompanionLab. Move it out of that folder, then install again.");
             // Her input helper lives a moment after she closes, so a copy on its way out gets a few seconds.
-            foreach (Process process in Process.GetProcessesByName("Capri"))
+            foreach (Process process in Process.GetProcessesByName("CompanionLab"))
             {
                 using (process)
                 {
-                    try { if (string.Equals(process.MainModule.FileName, Path.Combine(destination, "Capri.exe"), StringComparison.OrdinalIgnoreCase) && !process.WaitForExit(3000)) throw new IOException("Quit Capri from her tray menu, then install again."); }
+                    try { if (string.Equals(process.MainModule.FileName, Path.Combine(destination, "CompanionLab.exe"), StringComparison.OrdinalIgnoreCase) && !process.WaitForExit(3000)) throw new IOException("Quit CompanionLab from her tray menu, then install again."); }
                     catch (System.ComponentModel.Win32Exception) { }
                 }
             }
             Directory.CreateDirectory(destination);
+            WriteNotices(destination);
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
-            File.WriteAllText(marker, "Capri desktop companion " + version);
-            string target = Path.Combine(destination, "Capri.exe");
+            File.WriteAllText(marker, "CompanionLab desktop companion " + version);
+            string target = Path.Combine(destination, "CompanionLab.exe");
             string temporary = target + ".new";
             try
             {
@@ -158,15 +172,15 @@ namespace CapriSetup
             }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
             File.Copy(Application.ExecutablePath, Path.Combine(destination, "Uninstall.exe"), true);
-            string unsaved = Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs, Environment.SpecialFolderOption.Create), "Capri.lnk"), target);
-            string onDesktop = desktop ? Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolderOption.Create), "Capri.lnk"), target) : null;
+            string unsaved = Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs, Environment.SpecialFolderOption.Create), "CompanionLab.lnk"), target);
+            string onDesktop = desktop ? Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolderOption.Create), "CompanionLab.lnk"), target) : null;
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath))
             {
-                key.SetValue("DisplayName", "Capri");
+                key.SetValue("DisplayName", "CompanionLab");
                 key.SetValue("DisplayVersion", version);
-                key.SetValue("Publisher", "Capri fan project");
+                key.SetValue("Publisher", "CompanionLab fan project");
                 key.SetValue("InstallLocation", destination);
-                key.SetValue("DisplayIcon", Path.Combine(destination, "Capri.exe"));
+                key.SetValue("DisplayIcon", Path.Combine(destination, "CompanionLab.exe"));
                 key.SetValue("UninstallString", "\"" + Path.Combine(destination, "Uninstall.exe") + "\" --uninstall");
                 key.SetValue("NoModify", 1, RegistryValueKind.DWord);
                 key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
@@ -206,7 +220,7 @@ namespace CapriSetup
                 Directory.CreateDirectory(data);
                 FetchVoice(data, delegate { }, delegate { return false; });
                 if (!VoicePack.Complete(VoicePack.Folder(data))) throw new IOException("The local speech model is missing files after installing.");
-                File.WriteAllText(Path.Combine(data, "voice-test.txt"), "PASS the local speech model downloaded, matched its SHA-256 and unpacked where Capri looks for it\n");
+                File.WriteAllText(Path.Combine(data, "voice-test.txt"), "PASS the local speech model downloaded, matched its SHA-256 and unpacked where CompanionLab looks for it\n");
                 return 0;
             }
             catch (Exception error) { Directory.CreateDirectory(data); File.WriteAllText(Path.Combine(data, "failure.txt"), error.ToString()); return 1; }
@@ -214,7 +228,7 @@ namespace CapriSetup
 
         internal static string Megabytes(long bytes) { return (bytes >> 20) + " MB"; }
 
-        // Her local speech model goes where Capri's own download puts it, under the same file names, so either can finish
+        // Her local speech model goes where CompanionLab's own download puts it, under the same file names, so either can finish
         // a download the other started.
         internal static void FetchVoice(string data, Action<string, long, long> progress, Func<bool> stopped)
         {
@@ -237,7 +251,7 @@ namespace CapriSetup
                 try
                 {
                     HttpWebRequest request = (HttpWebRequest)WebRequest.Create(VoicePack.Url);
-                    request.UserAgent = "Capri-Setup";
+                    request.UserAgent = "CompanionLab-Setup";
                     request.Timeout = 30000;
                     request.ReadWriteTimeout = 60000;
                     if (have > 0) request.AddRange(have);
@@ -273,7 +287,7 @@ namespace CapriSetup
             string sum;
             using (SHA256 sha = SHA256.Create())
             using (FileStream file = File.OpenRead(part)) sum = BitConverter.ToString(sha.ComputeHash(file)).Replace("-", "").ToLowerInvariant();
-            if (have != VoicePack.Size || sum != VoicePack.Sha) { File.Delete(part); throw new IOException("The download came down damaged. Try again from Capri Mainframe."); }
+            if (have != VoicePack.Size || sum != VoicePack.Sha) { File.Delete(part); throw new IOException("The download came down damaged. Try again from CompanionLab Mainframe."); }
             if (File.Exists(zip)) File.Delete(zip);
             File.Move(part, zip);
             progress("Unpacking", VoicePack.Size, VoicePack.Size);
@@ -291,7 +305,7 @@ namespace CapriSetup
             try
             {
                 FileVersionInfo info = FileVersionInfo.GetVersionInfo(path);
-                return info.ProductName == "Capri" && string.Equals(info.OriginalFilename, "Capri.exe", StringComparison.OrdinalIgnoreCase);
+                return info.ProductName == "CompanionLab" && string.Equals(info.OriginalFilename, "CompanionLab.exe", StringComparison.OrdinalIgnoreCase);
             }
             catch (FileNotFoundException) { return false; }
         }
@@ -308,7 +322,7 @@ namespace CapriSetup
                 {
                     link.SetPath(target);
                     link.SetWorkingDirectory(Path.GetDirectoryName(target));
-                    link.SetDescription("Capri desktop companion");
+                    link.SetDescription("CompanionLab desktop companion");
                     link.SetIconLocation(target, 0);
                     ((System.Runtime.InteropServices.ComTypes.IPersistFile)link).Save(path, true);
                 }
@@ -359,7 +373,7 @@ namespace CapriSetup
 
         internal static void BeginUninstall()
         {
-            string temporary = Path.Combine(Path.GetTempPath(), "Capri-Uninstall-" + Guid.NewGuid().ToString("N") + ".exe");
+            string temporary = Path.Combine(Path.GetTempPath(), "CompanionLab-Uninstall-" + Guid.NewGuid().ToString("N") + ".exe");
             File.Copy(Application.ExecutablePath, temporary);
             Process.Start(new ProcessStartInfo(temporary, "--remove-files") { UseShellExecute = true });
         }
@@ -369,8 +383,8 @@ namespace CapriSetup
             try
             {
                 string destination = Path.GetFullPath(InstallPath);
-                string expected = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Capri"));
-                if (!string.Equals(destination, expected, StringComparison.OrdinalIgnoreCase) || !File.Exists(Path.Combine(destination, ".capri-install"))) throw new IOException("The Capri install marker could not be verified.");
+                string expected = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CompanionLab"));
+                if (!string.Equals(destination, expected, StringComparison.OrdinalIgnoreCase) || !File.Exists(Path.Combine(destination, ".companionlab-install"))) throw new IOException("The CompanionLab install marker could not be verified.");
                 CloseEverything(destination);
                 string uninstaller = Path.Combine(destination, "Uninstall.exe");
                 for (int i = 0; i < 25; i++)
@@ -378,25 +392,25 @@ namespace CapriSetup
                     try { File.Delete(uninstaller); break; }
                     catch (IOException) { System.Threading.Thread.Sleep(100); }
                 }
-                if (File.Exists(uninstaller)) throw new IOException("The uninstaller is still open. Close it and try removing Capri again.");
-                Patiently(delegate { File.Delete(Path.Combine(destination, "Capri.exe")); });
-                File.Delete(Path.Combine(destination, ".capri-install"));
+                if (File.Exists(uninstaller)) throw new IOException("The uninstaller is still open. Close it and try removing CompanionLab again.");
+                Patiently(delegate { File.Delete(Path.Combine(destination, "CompanionLab.exe")); });
+                File.Delete(Path.Combine(destination, ".companionlab-install"));
                 foreach (string pack in new[] { "brain", "voice", "ears" })
                 {
                     string folder = Path.Combine(destination, pack);
                     Patiently(delegate { if (Directory.Exists(folder)) Directory.Delete(folder, true); });
                 }
-                DeleteShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Capri.lnk"), destination);
-                DeleteShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Capri.lnk"), destination);
-                Startup.Clear(Path.Combine(destination, "Capri.exe"));
+                DeleteShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "CompanionLab.lnk"), destination);
+                DeleteShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "CompanionLab.lnk"), destination);
+                Startup.Clear(Path.Combine(destination, "CompanionLab.exe"));
                 Registry.CurrentUser.DeleteSubKeyTree(RegistryPath, false);
-                Notice.Tell(null, "Capri has been removed.\n\nYour position and size settings were kept in " + destination + ".", "Capri", false);
+                Notice.Tell(null, "CompanionLab has been removed.\n\nYour position and size settings were kept in " + destination + ".", "CompanionLab", false);
                 return 0;
             }
-            catch (Exception error) { Notice.Tell(null, error.Message, "Capri could not be removed", true); return 1; }
+            catch (Exception error) { Notice.Tell(null, error.Message, "CompanionLab could not be removed", true); return 1; }
         }
 
-        // Capri and anything running from her folder, like her brain's engine, hold its files, so they're closed first.
+        // CompanionLab and anything running from her folder, like her brain's engine, hold its files, so they're closed first.
         // Nothing outside the folder is touched.
         internal static void CloseEverything(string folder)
         {
@@ -440,14 +454,14 @@ namespace CapriSetup
         // A shortcut that can't be read or removed stays behind instead of stopping the rest of the uninstall.
         private static void DeleteShortcut(string path, string destination)
         {
-            try { if (File.Exists(path) && string.Equals(LinkTarget(path), Path.Combine(destination, "Capri.exe"), StringComparison.OrdinalIgnoreCase)) File.Delete(path); }
+            try { if (File.Exists(path) && string.Equals(LinkTarget(path), Path.Combine(destination, "CompanionLab.exe"), StringComparison.OrdinalIgnoreCase)) File.Delete(path); }
             catch (Exception) { }
         }
     }
 
     // Her installer in her Mainframe's look: a borderless window cut at the corners with a red rim and hot red strokes over her
-    // wine glow, INSTALL CAPRI in rose for its title, its options on a band, cyan tick boxes, and a solid cyan Install Capri
-    // (a red Remove Capri). It drags from anywhere that isn't a control and lays itself out for the screen's scale.
+    // wine glow, INSTALL COMPANIONLAB in rose for its title, its options on a band, cyan tick boxes, and a solid cyan Install CompanionLab
+    // (a red Remove CompanionLab). It drags from anywhere that isn't a control and lays itself out for the screen's scale.
     internal sealed class SetupWindow : Form
     {
         private readonly bool removing;
@@ -469,7 +483,7 @@ namespace CapriSetup
         internal SetupWindow(bool uninstall)
         {
             removing = uninstall;
-            Text = removing ? "Remove Capri" : "Install Capri";
+            Text = removing ? "Remove CompanionLab" : "Install CompanionLab";
             FormBorderStyle = FormBorderStyle.None;
             MaximizeBox = false;
             MinimizeBox = true;
@@ -481,8 +495,8 @@ namespace CapriSetup
             ForeColor = Neon.White;
             DoubleBuffered = true;
             Font = Neon.Type(10.5f);
-            using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("Capri.Chip.ico")) if (source != null) Icon = new Icon(source);
-            LabelAt(removing ? "REMOVE CAPRI" : "INSTALL CAPRI", 24, 14, 420, 32, Neon.Display(15f), Neon.Rose);
+            using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("CompanionLab.Chip.ico")) if (source != null) Icon = new Icon(source);
+            LabelAt(removing ? "REMOVE COMPANIONLAB" : "INSTALL COMPANIONLAB", 24, 14, 420, 32, Neon.Display(15f), Neon.Rose);
             Glyph(1, 680 - 86, delegate { WindowState = FormWindowState.Minimized; });
             Glyph(2, 680 - 54, delegate { Close(); });
             LabelAt(removing ? "See you around." : "Unofficial\nDesktop Mate!", 32, 64, 420, 124, Neon.Display(30f), Neon.White);
@@ -490,9 +504,9 @@ namespace CapriSetup
             chip.Bounds = Box(462, 74, 180, 112);
             chip.SizeMode = PictureBoxSizeMode.Zoom;
             chip.BackColor = Color.Transparent;
-            using (Stream image = Assembly.GetExecutingAssembly().GetManifestResourceStream("Capri.Chip.png")) if (image != null) using (Bitmap loaded = new Bitmap(image)) chip.Image = new Bitmap(loaded);
+            using (Stream image = Assembly.GetExecutingAssembly().GetManifestResourceStream("CompanionLab.Chip.png")) if (image != null) using (Bitmap loaded = new Bitmap(image)) chip.Image = new Bitmap(loaded);
             Controls.Add(chip);
-            LabelAt(removing ? "Remove the app and its shortcuts for this Windows user.\nQuit Capri from the tray before continuing." : "Right-click for her menu.", 34, 198, 610, 50, Neon.Type(11f), Neon.Faint);
+            LabelAt(removing ? "Remove the app and its shortcuts for this Windows user.\nQuit CompanionLab from the tray before continuing." : "Right-click for her menu.", 34, 198, 610, 50, Neon.Type(11f), Neon.Faint);
             section = LabelAt("OPTIONS", 34, 254, 400, 20, Neon.Type(10f, true), Neon.White);
             section.Visible = !removing;
             desktop = new Tick();
@@ -500,7 +514,7 @@ namespace CapriSetup
             desktop.Bounds = Box(34, 284, 340, 26);
             desktop.Visible = !removing;
             launch = new Tick();
-            launch.Text = "Open Capri when finished";
+            launch.Text = "Open CompanionLab when finished";
             launch.Checked = true;
             launch.Bounds = Box(34, 314, 340, 26);
             launch.Visible = !removing;
@@ -512,7 +526,7 @@ namespace CapriSetup
             note = LabelAt("", 34, 314, 604, 22, Neon.Type(10f), Neon.Faint);
             note.Visible = false;
             primary = new Plate();
-            primary.Text = removing ? "Remove Capri" : "Install Capri";
+            primary.Text = removing ? "Remove CompanionLab" : "Install CompanionLab";
             primary.Accent = removing ? Neon.Hot : Neon.Cyan;
             primary.Solid = true;
             primary.Font = Neon.Type(11.5f, true);
@@ -526,7 +540,7 @@ namespace CapriSetup
             cancel.Click += delegate
             {
                 if (!fetching) { Close(); return; }
-                // Skipping the speech model still leaves Capri installed; she can fetch it later from her Mainframe.
+                // Skipping the speech model still leaves CompanionLab installed; she can fetch it later from her Mainframe.
                 stopping = true;
                 cancel.Enabled = false;
                 status.Text = "Skipping it…";
@@ -622,21 +636,20 @@ namespace CapriSetup
             try
             {
                 if (removing) { Program.BeginUninstall(); Close(); return; }
-                status.Text = "Making a little room for Capri…";
+                status.Text = "Making a little room for CompanionLab…";
                 noShortcut = Program.Install(desktop.Checked);
             }
-            catch (Exception error) { status.Text = "Capri could not finish. Your files are still here."; primary.Enabled = true; Notice.Tell(this, error.Message, "Capri couldn't install", true); return; }
-            if (Environment.Is64BitOperatingSystem && !VoicePack.Complete(VoicePack.Folder(Program.InstallPath))) FetchVoice();
-            else Finish();
+            catch (Exception error) { status.Text = "CompanionLab could not finish. Your files are still here."; primary.Enabled = true; Notice.Tell(this, error.Message, "CompanionLab couldn't install", true); return; }
+            Finish();
         }
 
-        // Without her shortcut she's still installed, so they're told why and shown Capri.exe to pin.
+        // Without her shortcut she's still installed, so they're told why and shown CompanionLab.exe to pin.
         private void Finish()
         {
-            string app = Path.Combine(Program.InstallPath, "Capri.exe");
+            string app = Path.Combine(Program.InstallPath, "CompanionLab.exe");
             if (noShortcut != null)
             {
-                Notice.Tell(this, "Capri is installed, but Windows wouldn't let the installer save her shortcut:\n" + noShortcut + "\n\nShe's in " + Program.InstallPath + ". Right-click Capri.exe there and pick Pin to Start.", "Capri", false);
+                Notice.Tell(this, "CompanionLab is installed, but Windows wouldn't let the installer save her shortcut:\n" + noShortcut + "\n\nShe's in " + Program.InstallPath + ". Right-click CompanionLab.exe there and pick Pin to Start.", "CompanionLab", false);
                 try { using (Process.Start("explorer.exe", "/select,\"" + app + "\"")) { } }
                 catch (System.ComponentModel.Win32Exception) { }
             }
@@ -698,7 +711,7 @@ namespace CapriSetup
             fetching = false;
             if (string.IsNullOrEmpty(failed)) { Finish(); return; }
             stage.Text = "Couldn't install the local speech model";
-            note.Text = "Capri is installed. Get it later in Capri Mainframe, or add an API key.";
+            note.Text = "CompanionLab is installed. Get it later in CompanionLab Mainframe, or add an API key.";
             status.Text = failed;
             cancel.Visible = false;
             primary.Text = "Finish";

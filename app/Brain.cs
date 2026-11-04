@@ -456,12 +456,27 @@ namespace CapriDesktop
             get
             {
                 string yours = Personality;
-                return yours == DefaultPersonality ? DefaultPersonality + "\n" + Safety + "\n" + Machinery : yours + "\n" + Holds + "\n" + Safety + "\n" + Machinery;
+                string identity = CharacterName == "Capri" ? "" : "Your current character name is " + CharacterName + ". Older Capri references describe inherited app behavior.\n";
+                return identity + (yours == DefaultPersonality ? DefaultPersonality + "\n" + Safety + "\n" + Machinery : yours + "\n" + Holds + "\n" + Safety + "\n" + Machinery);
             }
         }
 
         internal const string PersonalityName = "personality.md";
         internal static string PersonalityPath;
+        private static string CharacterName = "Capri", CharacterDefault;
+
+        internal static void UseCharacter(string name, string personality, string path)
+        {
+            lock (personalityGate)
+            {
+                int skipped;
+                string kept = personality == null ? null : Kept(Readable(personality), out skipped);
+                CharacterName = name;
+                CharacterDefault = personality == null ? null : string.IsNullOrWhiteSpace(kept) ? "You are " + name + ", a personal desktop companion." : kept;
+                PersonalityPath = path;
+                personalitySeen = null;
+            }
+        }
         internal const string PersonalityHead =
             "<!--\n" +
             "personality.md: who Capri is and how she talks. Rewrite any of it and save, and her next reply uses it. No restart.\n" +
@@ -484,7 +499,7 @@ namespace CapriDesktop
 
         internal static string PersonalityBackup { get { string path = PersonalityPath; return path == null ? null : Path.Combine(Path.GetDirectoryName(path), "personality.backup.md"); } }
 
-        internal static string PersonalityFile { get { return (PersonalityHead + DefaultPersonality.Replace("\n", "\n\n") + "\n").Replace("\n", Environment.NewLine); } }
+        internal static string PersonalityFile { get { return (PersonalityHead + (CharacterDefault ?? DefaultPersonality).Replace("\n", "\n\n") + "\n").Replace("\n", Environment.NewLine); } }
 
         internal static string Personality { get { string note; return ReadPersonality(out note); } }
 
@@ -502,11 +517,12 @@ namespace CapriDesktop
         {
             string path = PersonalityPath;
             note = "";
-            if (path == null) return DefaultPersonality;
+            string fallback = CharacterDefault ?? DefaultPersonality;
+            if (path == null) return fallback;
             try
             {
                 FileInfo file = new FileInfo(path);
-                if (!file.Exists) return DefaultPersonality;
+                if (!file.Exists) return fallback;
                 string seen = path + "|" + file.LastWriteTimeUtc.Ticks + "|" + file.Length;
                 lock (personalityGate)
                 {
@@ -516,7 +532,7 @@ namespace CapriDesktop
                         int skipped;
                         string kept = Kept(plain, out skipped);
                         bool hers = kept.Length == 0 || plain == DefaultPersonality || Retired.Contains(Stamp(plain));
-                        personalityText = hers ? DefaultPersonality : kept;
+                        personalityText = hers ? fallback : kept;
                         personalityNote = hers ? "" : skipped > 0 ? skipped + (skipped == 1 ? " line" : " lines") + " skipped: they went against her safety lines" : kept.Length > LongPersonality ? LongNote : "";
                         personalitySeen = seen;
                     }
@@ -524,8 +540,8 @@ namespace CapriDesktop
                     return personalityText;
                 }
             }
-            catch (IOException) { note = CantRead; return DefaultPersonality; }
-            catch (UnauthorizedAccessException) { note = CantRead; return DefaultPersonality; }
+            catch (IOException) { note = CantRead; return fallback; }
+            catch (UnauthorizedAccessException) { note = CantRead; return fallback; }
         }
 
         // personality.md as words: no <!-- notes -->, no blank lines, and the same text whatever line endings it was saved with.

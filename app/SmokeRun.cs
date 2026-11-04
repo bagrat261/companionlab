@@ -271,7 +271,7 @@ namespace CapriDesktop
             string output = Path.GetFullPath(args[1]);
             Directory.CreateDirectory(output);
             string identity = WindowsIdentity.GetCurrent().User.Value;
-            using (Mutex mutex = new Mutex(false, "Local\\Capri.Desktop." + identity + ".Test"))
+            using (Mutex mutex = new Mutex(false, "Local\\CompanionLab.Desktop." + identity + ".Test"))
             {
                 bool held;
                 try { held = mutex.WaitOne(0); } catch (AbandonedMutexException) { held = true; }

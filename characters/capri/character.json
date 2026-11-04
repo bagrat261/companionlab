@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "capri",
+  "name": "Capri",
+  "renderer": "capri-strip-v1",
+  "voice": { "mode": "inherit", "pitch": 0, "speed": 100 },
+  "sprites": []
+}

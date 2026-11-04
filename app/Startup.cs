@@ -9,7 +9,7 @@ namespace CapriDesktop
     {
         internal static string RunKey = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
         internal static string ApprovedKey = "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
-        internal const string Name = "Capri";
+        internal const string Name = "CompanionLab";
 
         internal static bool On(string exe)
         {

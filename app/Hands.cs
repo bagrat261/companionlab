@@ -1428,6 +1428,22 @@ namespace CapriDesktop
 
         internal static string Do(string tool, ToolArguments args)
         {
+            ActionJournal.Record(tool, "requested");
+            try
+            {
+                string result = Perform(tool, args);
+                ActionJournal.Record(tool, "returned");
+                return result;
+            }
+            catch
+            {
+                ActionJournal.Record(tool, "threw");
+                throw;
+            }
+        }
+
+        private static string Perform(string tool, ToolArguments args)
+        {
             if (args == null) args = new ToolArguments();
             try
             {

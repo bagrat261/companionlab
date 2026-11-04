@@ -493,8 +493,7 @@ namespace CapriDesktop
         // After a clip saves, off the UI thread: its path, how many seconds, and the game.
         internal Action<string, double, string, string> Saved;
 
-        // Where clips go: Videos\Capri Clips, wherever Windows keeps their Videos.
-        internal static string Folder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Capri Clips"); } }
+        internal static string Folder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "CompanionLab Clips"); } }
 
         // What she says for a saved clip: how long and of what, without the file's path, which the CLIP SAVED popup shows.
         internal static string Spoken(string result)
