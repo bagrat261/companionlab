@@ -1,3 +1,5 @@
+> **CompanionLab personal fork:** read [COMPANIONLAB.md](COMPANIONLAB.md) for this fork's build, isolated data paths and character selection. The Capri download links below belong to the original project; CompanionLab does not install those updates.
+
 <div align="center">
 
 <img src="assets/capri.png" alt="Capri" width="240">
