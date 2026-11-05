@@ -74,6 +74,16 @@ namespace CapriDesktop
                     Migrate(incomplete);
                     if (incomplete.Permissions != Security.Of(Security.Guarded) || incomplete.Bypass || incomplete.HeyCapri) throw new Exception("Missing permissions enabled privileged behavior.");
                 });
+                verify("0.8.3 permission extensions survive validation", delegate
+                {
+                    Preferences saved = new Preferences { Permissions = "11100000001", HeyCapri = true };
+                    ConservativePermissions(saved);
+                    if (saved.Permissions != "11100000001" || !saved.HeyCapri) throw new Exception("Valid extended permissions were reset.");
+                });
+                verify("Husk discovery uses the fork data directory", delegate
+                {
+                    if (Path.GetFileName(HuskHook.Data) != "CompanionLab") throw new Exception("Husk discovery shares original Capri data.");
+                });
                 verify("crash recovery keeps keys and conservative fork defaults", delegate
                 {
                     string recovery = Path.Combine(output, "character-recovery");

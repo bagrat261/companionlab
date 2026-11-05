@@ -187,7 +187,7 @@ namespace CapriDesktop
 
         internal static void ConservativePermissions(Preferences settings)
         {
-            if (settings.Permissions != null && settings.Permissions.Length == 10 && settings.Permissions.Trim('0', '1').Length == 0) return;
+            if (settings.Permissions != null && (settings.Permissions.Length == Security.Wake || settings.Permissions.Length == Security.Wake + 1) && settings.Permissions.Trim('0', '1').Length == 0) return;
             settings.Permissions = Security.Of(Security.Guarded);
             settings.Bypass = settings.HeyCapri = false;
         }

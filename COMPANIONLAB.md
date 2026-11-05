@@ -1,6 +1,8 @@
 # CompanionLab: первая итерация
 
-Личный некоммерческий форк [Capri Desktop](https://github.com/lachydotmcg/capri-desktop). Основа: стабильный [релиз 0.8.2](https://github.com/lachydotmcg/capri-desktop/releases/tag/v0.8.2), commit `a5bc79592995359b347075d92233d0654f84fbe2`. Ветка: `companionlab/iteration-1`.
+Личный некоммерческий [форк CompanionLab](https://github.com/bagrat261/companionlab) проекта [Capri Desktop](https://github.com/lachydotmcg/capri-desktop). Обновлён до стабильного [релиза 0.8.3](https://github.com/lachydotmcg/capri-desktop/releases/tag/v0.8.3), commit `82a5c6b8fa2a873a4d04f21131fcd76c25620dd9`. Для облачного продолжения используйте `main`: [инструкция](docs/CLOUD-HANDOFF.md). Исходная проверенная итерация на 0.8.2 сохранена в `companionlab/iteration-1-v0.8.2`; её исторический отчёт не описывает результаты тестов обновления.
+
+Изменения и ограничения обновления: [UPDATE-0.8.3.md](docs/UPDATE-0.8.3.md). Call mode и автоматическое подключение к звонкам отключены в обычном режиме CompanionLab: Discord запланирован отдельным модулем официального бота. Husk выключен по умолчанию; включение может устанавливать hooks Codex/Claude и требует осознанного выбора в настройках.
 
 Сохранены исходный C# 5, WinForms и .NET Framework 4.8. `README.md` содержит исходную документацию Capri; для этого форка следуйте настоящему файлу. Установщики оригинальной Capri для обновления CompanionLab отключены.
 

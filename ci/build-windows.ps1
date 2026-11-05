@@ -25,6 +25,7 @@ $icon = Join-Path $root 'assets\chip.ico'
 $legal = @(
     ('/resource:' + (Join-Path $root 'LICENSE.md') + ',CompanionLab.LICENSE.md'),
     ('/resource:' + (Join-Path $root 'NOTICE.md') + ',CompanionLab.NOTICE.md'),
+    ('/resource:' + (Join-Path $root 'THIRD-PARTY-NOTICES.md') + ',CompanionLab.THIRD-PARTY-NOTICES.md'),
     ('/resource:' + (Join-Path $root 'assets\fonts\OFL-ShareTechMono.txt') + ',CompanionLab.OFL-ShareTechMono.txt')
 )
 $shared = @('/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/utf8output', '/warn:4', ('/win32manifest:' + (Join-Path $root 'app\app.manifest')), ('/win32icon:' + $icon), '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll')
@@ -36,13 +37,13 @@ $resources += ('/resource:' + (Join-Path $root 'assets\cursor.png') + ',Capri.Cu
 $resources += ('/resource:' + (Join-Path $root 'assets\vbcable\VBCABLE_Driver_Pack45.zip') + ',Capri.VBCABLE.zip')
 $resources += Get-ChildItem -LiteralPath (Join-Path $root 'assets\sprites') -Filter *.png | ForEach-Object { '/resource:' + $_.FullName + ',Capri.Sprite.' + $_.Name }
 $resources += Get-ChildItem -LiteralPath (Join-Path $root 'assets\voice') -Filter *.wav | ForEach-Object { '/resource:' + $_.FullName + ',Capri.Voice.' + $_.Name }
-$sources = @('Capri', 'Characters', 'CharacterHost', 'CharacterChecks', 'ActionJournal', 'Asides', 'Bolts', 'Commentary', 'Lookout', 'Brain', 'Talk', 'Mainframe', 'MainframeTips', 'TipChecks', 'MediumChecks', 'FreeKeyChecks', 'Neon', 'Notice', 'Engine', 'Ledges', 'Voice', 'Ears', 'MicMix', 'CableSetup', 'Dictation', 'HearingStatus', 'Agent', 'Hands', 'GameHud', 'Computer', 'Arrange', 'Mixer', 'Usage', 'Network', 'Play', 'VoicePack', 'Startup', 'Presence', 'Player', 'Ocr', 'GameEars', 'GameNotes', 'GameKeys', 'Frames', 'Reminders', 'GameSense', 'GameWatch', 'SelfKnow', 'Care', 'Clips', 'ClipSettings', 'ClipChecks', 'Minis', 'Chess', 'ChessBoard', 'Files', 'FileFinder', 'Websites', 'Ink', 'Clones', 'ChaosScreen', 'Icons', 'FollowUps', 'WatchAlong', 'CallMode', 'CallEars', 'CallPanel', 'Reactions', 'ToolChecks', 'SmokeRun', 'AssemblyInfo') | ForEach-Object { Join-Path $root ('app\' + $_ + '.cs') }
+$sources = @('Capri', 'Characters', 'CharacterHost', 'CharacterChecks', 'ActionJournal', 'Asides', 'Bolts', 'Commentary', 'Lookout', 'Brain', 'Talk', 'Mainframe', 'MainframeMods', 'MainframeModsWindow', 'Mods', 'ModDirectory', 'CodeMods', 'SoundsLike', 'SkinMods', 'ArtColors', 'MainframeTips', 'TipChecks', 'MediumChecks', 'FreeKeyChecks', 'Neon', 'Notice', 'Engine', 'Ledges', 'Voice', 'Ears', 'MicMix', 'CableSetup', 'Dictation', 'HearingStatus', 'Agent', 'Hands', 'GameHud', 'Computer', 'Arrange', 'Mixer', 'Usage', 'Network', 'Play', 'VoicePack', 'Startup', 'Presence', 'Player', 'Ocr', 'GameEars', 'GameNotes', 'GameKeys', 'Frames', 'Reminders', 'GameSense', 'GameWatch', 'SelfKnow', 'Care', 'Clips', 'ClipSettings', 'ClipChecks', 'Minis', 'Chess', 'ChessBoard', 'Files', 'FileFinder', 'Websites', 'Ink', 'Clones', 'ChaosScreen', 'Icons', 'FollowUps', 'WatchAlong', 'CallMode', 'Husk', 'CallEars', 'CallPanel', 'Reactions', 'ToolChecks', 'SmokeRun', 'AssemblyInfo') | ForEach-Object { Join-Path $root ('app\' + $_ + '.cs') }
 Invoke-Compiler ($shared + $references + $resources + @('/unsafe+', ('/out:' + $app)) + $sources) 'application'
 if ($LASTEXITCODE -ne 0) { throw 'Capri compilation failed.' }
 Invoke-Compiler ($shared + $legal + @(('/out:' + $setup), '/reference:Microsoft.CSharp.dll', '/reference:System.IO.Compression.dll', '/reference:System.IO.Compression.FileSystem.dll', ('/resource:' + $app + ',CompanionLab.App.exe'), ('/resource:' + $icon + ',CompanionLab.Chip.ico'), ('/resource:' + (Join-Path $root 'assets\chip.png') + ',CompanionLab.Chip.png'), (Join-Path $root 'app\Setup.cs'), (Join-Path $root 'app\Neon.cs'), (Join-Path $root 'app\Notice.cs'), (Join-Path $root 'app\VoicePack.cs'), (Join-Path $root 'app\Startup.cs'), (Join-Path $root 'app\AssemblyInfo.cs'))) 'installer'
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
 Write-Output "Built $app and $setup"
-Copy-Item -LiteralPath (Join-Path $root 'LICENSE.md'), (Join-Path $root 'NOTICE.md'), (Join-Path $root 'assets\fonts\OFL-ShareTechMono.txt') -Destination $out -Force
+Copy-Item -LiteralPath (Join-Path $root 'LICENSE.md'), (Join-Path $root 'NOTICE.md'), (Join-Path $root 'THIRD-PARTY-NOTICES.md'), (Join-Path $root 'assets\fonts\OFL-ShareTechMono.txt') -Destination $out -Force
 if (-not $SmokeTest) { return }
 $runtime = Join-Path $out 'smoke\runtime'
 $package = Join-Path $out 'smoke\package'

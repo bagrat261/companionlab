@@ -23,13 +23,25 @@ namespace CapriSetup
         [STAThread]
         private static int Main(string[] args)
         {
+            try
+            {
+                int mode = SetupFiles.Mode(args);
+                if (mode == 2) return RemoveFiles(true);
+                if (mode == 1)
+                {
+                    string unsaved = Install(false);
+                    if (unsaved != null) throw new IOException("CompanionLab is installed, but her shortcut could not be saved: " + unsaved);
+                    return 0;
+                }
+            }
+            catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
             try { SetProcessDpiAwarenessContext(new IntPtr(-4)); } catch (EntryPointNotFoundException) { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             if (args.Length > 0 && args[0] == "--update") return Update(args);
             if (args.Length == 2 && args[0] == "--verify") return Verify(args[1]);
             if (args.Length == 2 && args[0] == "--verify-voice") return VerifyVoice(args[1]);
-            if (args.Length == 1 && args[0] == "--remove-files") return RemoveFiles();
+            if (args.Length == 1 && args[0] == "--remove-files") return RemoveFiles(false);
             using (SetupWindow window = new SetupWindow(args.Length == 1 && args[0] == "--uninstall")) Application.Run(window);
             return 0;
         }
@@ -62,7 +74,7 @@ namespace CapriSetup
 
         private static void WriteNotices(string folder)
         {
-            foreach (string name in new[] { "LICENSE.md", "NOTICE.md", "OFL-ShareTechMono.txt" })
+            foreach (string name in new[] { "LICENSE.md", "NOTICE.md", "THIRD-PARTY-NOTICES.md", "OFL-ShareTechMono.txt" })
             {
                 using (Stream data = Assembly.GetExecutingAssembly().GetManifestResourceStream("CompanionLab." + name))
                 {
@@ -161,6 +173,10 @@ namespace CapriSetup
             }
             Directory.CreateDirectory(destination);
             WriteNotices(destination);
+            // Best-effort: an uninstaller still exiting, or antivirus holding its old copy, mustn't fail the install.
+            try { SetupFiles.ClearOld(Path.Combine(destination, "Uninstall.exe")); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
             File.WriteAllText(marker, "CompanionLab desktop companion " + version);
             string target = Path.Combine(destination, "CompanionLab.exe");
@@ -378,7 +394,7 @@ namespace CapriSetup
             Process.Start(new ProcessStartInfo(temporary, "--remove-files") { UseShellExecute = true });
         }
 
-        private static int RemoveFiles()
+        private static int RemoveFiles(bool silent)
         {
             try
             {
@@ -387,14 +403,8 @@ namespace CapriSetup
                 if (!string.Equals(destination, expected, StringComparison.OrdinalIgnoreCase) || !File.Exists(Path.Combine(destination, ".companionlab-install"))) throw new IOException("The CompanionLab install marker could not be verified.");
                 CloseEverything(destination);
                 string uninstaller = Path.Combine(destination, "Uninstall.exe");
-                for (int i = 0; i < 25; i++)
-                {
-                    try { File.Delete(uninstaller); break; }
-                    catch (IOException) { System.Threading.Thread.Sleep(100); }
-                }
-                if (File.Exists(uninstaller)) throw new IOException("The uninstaller is still open. Close it and try removing CompanionLab again.");
-                Patiently(delegate { File.Delete(Path.Combine(destination, "CompanionLab.exe")); });
-                File.Delete(Path.Combine(destination, ".companionlab-install"));
+                SetupFiles.Retire(uninstaller, string.Equals(Path.GetFullPath(Application.ExecutablePath), uninstaller, StringComparison.OrdinalIgnoreCase));
+                SetupFiles.RemoveApp(Path.Combine(destination, "CompanionLab.exe"));
                 foreach (string pack in new[] { "brain", "voice", "ears" })
                 {
                     string folder = Path.Combine(destination, pack);
@@ -402,12 +412,12 @@ namespace CapriSetup
                 }
                 DeleteShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "CompanionLab.lnk"), destination);
                 DeleteShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "CompanionLab.lnk"), destination);
-                Startup.Clear(Path.Combine(destination, "CompanionLab.exe"));
                 Registry.CurrentUser.DeleteSubKeyTree(RegistryPath, false);
-                Notice.Tell(null, "CompanionLab has been removed.\n\nYour position and size settings were kept in " + destination + ".", "CompanionLab", false);
+                File.Delete(Path.Combine(destination, ".companionlab-install"));
+                if (!silent) Notice.Tell(null, "CompanionLab has been removed.\n\nYour position and size settings were kept in " + destination + ".", "CompanionLab", false);
                 return 0;
             }
-            catch (Exception error) { Notice.Tell(null, error.Message, "CompanionLab could not be removed", true); return 1; }
+            catch (Exception error) { if (silent) Console.Error.WriteLine(error.Message); else Notice.Tell(null, error.Message, "CompanionLab could not be removed", true); return 1; }
         }
 
         // CompanionLab and anything running from her folder, like her brain's engine, hold its files, so they're closed first.
@@ -442,13 +452,7 @@ namespace CapriSetup
         // A file can stay locked for a moment after the program holding it closes.
         private static void Patiently(Action remove)
         {
-            for (int tries = 1; ; tries++)
-            {
-                try { remove(); return; }
-                catch (IOException) { if (tries == 10) throw; }
-                catch (UnauthorizedAccessException) { if (tries == 10) throw; }
-                System.Threading.Thread.Sleep(300);
-            }
+            SetupFiles.Patiently(remove);
         }
 
         // A shortcut that can't be read or removed stays behind instead of stopping the rest of the uninstall.
