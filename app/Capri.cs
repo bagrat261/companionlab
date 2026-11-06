@@ -829,6 +829,7 @@ namespace CapriDesktop
         [DataMember] public int Wordiness;
         [DataMember] public int Recall = 8;
         [DataMember] public int MemorySize;
+        [DataMember] public bool OllamaAgent;
         [DataMember] public int ReplyLength;
         // Remember our chats is on by default: transcripts and memories.md stay on this PC.
         [DataMember] public bool Remembers = true;
@@ -2489,6 +2490,7 @@ namespace CapriDesktop
                 return tool == "clip" && result != null && result.StartsWith("Saved ", StringComparison.Ordinal) ? ClipBuffer.Spoken(result) + " The CLIP SAVED popup shows where it went." : result;
             };
             brain.OwnSteps = !testing;
+            brain.OllamaSteps = preferences.OllamaAgent;
             Hands.Resume = ResumeJob;
             Hands.Rename = CallThem;
             Hands.Nap = NapTool;
@@ -29386,6 +29388,7 @@ namespace CapriDesktop
 
         private void RunSmokeSections(System.Collections.Generic.List<string> checks, string output, Func<string> findGame)
         {
+            Section(checks, "SmokeOllamaPlanning", delegate { SmokeOllamaPlanning(checks); });
             Section(checks, "SmokeCharacters", delegate { SmokeCharacters(checks, output); });
             Section(checks, "SmokeCharacterRegressions", delegate { SmokeCharacterRegressions(checks, output); });
             Section(checks, "HologramChecks", delegate { HologramChecks(checks, output); });

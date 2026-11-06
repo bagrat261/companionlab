@@ -2087,7 +2087,7 @@ namespace CapriDesktop
                     // A brain that turns out not to take tools goes back to her hands' shortcuts, from this message on.
                     if (calls.Count > 0 || !Toolless(error.Message)) throw;
                     Cloud fallen = Remote;
-                    if (fallen != null) toolless = fallen.Source;
+                    toolless = fallen != null ? fallen.Source : Ollama + "|" + model;
                 }
             }
             // With a game open, her hands see every message first: "kliknij deathmatch" or "keep going" mean something in it.
@@ -2320,6 +2320,7 @@ namespace CapriDesktop
 
         // F57: on a strong brain she works jobs out herself. Her own brain turns this on; brains made for checks leave it off.
         internal bool OwnSteps;
+        internal bool OllamaSteps;
 
         // F54: her voice is Fish Audio, which acts out emotion cues, so she's told she can use them.
         internal volatile bool Cues;
@@ -2332,7 +2333,9 @@ namespace CapriDesktop
         internal bool WorksOut()
         {
             Cloud remote = Remote;
-            return OwnSteps && remote != null && remote.Kind != "local" && HasTools(remote) && toolless != remote.Source;
+            if (!OwnSteps) return false;
+            if (remote != null) return remote.Kind != "local" && HasTools(remote) && toolless != remote.Source;
+            return OllamaSteps && Local == null && Server == null && Model != null && toolless != Ollama + "|" + Model;
         }
 
         // The brain holds her tools beside her own prompt: it calls one, sees what it did, calls the next, and answers as herself once
@@ -2361,7 +2364,8 @@ namespace CapriDesktop
                     // "Reminder set" with no remind behind it is a claim even after other tools ran this turn (F69, pass 4).
                     string claimed = Hands.Claimed(said, calls);
                     bool promised = calls.Count == 0 && (Hands.Promised(said) || Hands.Handed(said));
-                    if (claimed == null && !promised) return raw;
+                    bool unverifiedLocalTask = OllamaSteps && Remote == null && calls.Count == 0 && Hands.Wants(request);
+                    if (claimed == null && !promised && !unverifiedLocalTask) return raw;
                     if (reminded) return claimed == null ? Hands.Unpromised : Hands.Unclaimed(said, calls) ?? (calls.Count > 0 ? null : Hands.NotYet(claimed, kit));
                     reminded = true;
                     asking.Add(new ChatMessage("assistant", said));
